@@ -10,6 +10,12 @@ Working across HTTP boundaries with a HTTP client and server introduces friction
 2. **Forced to rely on out-of-band documentation** — All the information about the backend schema lives in OpenAPI/Swagger docs, where it's not visible in your editor.
 
 
+Your client side code can now have descriptive type information and docstrings right in the editor!
+
+![Screenshot of editor with type information for a backend function](docs/images/image.png)
+
+
+
 **How it works:**
 
 - Import server functions decorated with FastAPI/Flask on the client side
