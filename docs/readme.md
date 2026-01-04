@@ -40,11 +40,11 @@ from my_backend.server import (
 
 ```python
 from http_clientlib import set_default_configuration, wrap_backend_call
-from http_clientlib.http import perform_http_call
+from http_clientlib.http import make_http_request
 
 set_default_configuration(
     base_url="http://localhost:8000",
-    http_call_func=perform_http_call # Use HTTP method we provide
+    http_request_function=make_http_request # Use HTTP method we provide
 )
 ```
 
@@ -122,11 +122,11 @@ The `Configuration` class controls how HTTP calls are made:
 
 ```python
 from http_clientlib.configuration import Configuration
-from http_clientlib.http import perform_http_call
+from http_clientlib.http import make_http_request
 
 config = Configuration(
     base_url="http://localhost:8000",  # Your backend URL
-    http_call_func=perform_http_call   # Function to execute HTTP requests
+    http_request_function=make_http_request   # Function to execute HTTP requests
 )
 ```
 
@@ -136,20 +136,24 @@ config = Configuration(
 
 ```python
 from http_clientlib import set_default_configuration
+from http_clientlib.http import make_http_request
 
 # Set once for all wrapped functions
-set_default_configuration(config)
-
-# All wrapped functions will use this config
-wrapped_func = wrap_backend_call(my_endpoint)
-```
+set_default_configuration(
+    base_url="http://localhost:8000",
+    http_request_function=make_http_request
+)
 
 #### Local Configuration
 
 ```python
-# Pass configuration to specific wrapper
-wrapped_func = wrap_backend_call(my_endpoint, configuration=config)
-```
+from http_clientlib.configuration import Configuration
+from http_clientlib.http import make_http_request
+
+config = Configuration(
+    base_url="http://localhost:8000",
+    http_request_function=make_http_request
+)
 
 ### Custom HTTP Implementation
 
@@ -158,6 +162,8 @@ You can provide your own HTTP implementation:
 ```python
 import requests
 from http_clientlib.types import HTTPRequestMetadata
+from http_clientlib.configuration import Configuration
+from http_clientlib import set_default_configuration
 
 def custom_http_call(request: HTTPRequestMetadata):
     """Custom HTTP implementation with retry logic."""
@@ -183,6 +189,18 @@ def custom_http_call(request: HTTPRequestMetadata):
 # Use custom implementation
 config = Configuration(
     base_url="http://api.example.com",
+    http_request_function=custom_http_call
+)
+set_default_configuration(
+    base_url=config.base_url,
+    http_request_function=config.http_request_function
+)
+```             continue
+            raise
+
+# Use custom implementation
+config = Configuration(
+    base_url="http://api.example.com",
     http_call_func=custom_http_call
 )
 ```
@@ -191,58 +209,51 @@ config = Configuration(
 
 ### Core Functions
 
+
+
+#### `set_default_configuration(base_url, http_request_function)`
+
+Sets the global default configuration for all wrapped functions.
+
+**Parameters:**
+- `base_url` (str): The base URL for all HTTP requests
+- `http_request_function` (Callable): Function to execute HTTP requests
+
+**Example:**
+```python
+from http_clientlib.http import make_http_request
+
+set_default_configuration(
+    base_url="http://localhost:8000",
+    http_request_function=make_http_request
+)
+```
+
+---
+
 #### `wrap_backend_call(func, configuration=None)`
 
 Wraps a FastAPI/Flask endpoint function to make HTTP calls.
 
 **Parameters:**
+
 - `func` (Callable): The backend function to wrap
 - `configuration` (Configuration, optional): Configuration to use. If None, uses global default
 
 **Returns:**
+
 - Callable that makes HTTP requests and returns HTTPResponse
 
 **Example:**
+
 ```python
 from my_backend import get_user
 
 get_user_http = wrap_backend_call(get_user)
-response = get_user_http(user_id=123)
 ```
 
----
 
-#### `set_default_configuration(configuration)`
 
-Sets the global default configuration for all wrapped functions.
-
-**Parameters:**
-- `configuration` (Configuration): The configuration to set as default
-
-**Example:**
-```python
-config = Configuration(base_url="http://localhost:8000")
-set_default_configuration(config)
-```
-
----
-
-#### `http_client_decorator(configuration=None)`
-
-Creates a decorator for wrapping multiple functions.
-
-**Parameters:**
-- `configuration` (Configuration, optional): Configuration to use
-
-**Returns:**
-- Decorator function
-
-**Example:**
-```python
-@http_client_decorator(config)
-def my_endpoint(user_id: int) -> Annotated[User, "GET /users/{user_id}"]:
-    pass
-```
 
 ### Types
 
@@ -293,36 +304,31 @@ A library-agnostic protocol for HTTP responses. Compatible with both `requests.R
 - `content`: Get raw bytes
 - `raise_for_status()`: Raise exception for error status codes
 
-**Example:**
-```python
-response = wrapped_func()
-if response.status_code == 200:
-    data = response.json()
-else:
-    response.raise_for_status()
-```
-
-### Configuration Class
-
 #### `Configuration`
 
 Holds configuration for HTTP client behavior.
 
 **Attributes:**
 - `base_url` (str): Base URL for API calls (default: "http://localhost:8000")
-- `http_call_func` (Callable): Function to execute HTTP requests
+- `http_request_function` (Callable): Function to execute HTTP requests (default: `mock_http_request`)
 
 **Example:**
 ```python
+from http_clientlib.http import make_http_request
+
 config = Configuration(
     base_url="https://api.production.com",
-    http_call_func=perform_http_call
+    http_request_function=make_http_request
 )
 ```
+**Attributes:**
+- `base_url` (str): Base URL for API calls (default: "http://localhost:8000")
+- `http_call_func` (Callable): Function to execute HTTP requests
 
+**Example:**
 ### HTTP Functions
 
-#### `perform_http_call(http_request)`
+#### `make_http_request(http_request)`
 
 Built-in HTTP implementation using `httpx`.
 
@@ -334,20 +340,27 @@ Built-in HTTP implementation using `httpx`.
 
 **Example:**
 ```python
-from http_clientlib.http import perform_http_call
+from http_clientlib.http import make_http_request
 
-response = perform_http_call(request_metadata)
+response = make_http_request(request_metadata)
 ```
 
 ---
 
-#### `mock_http_call(http_request)`
+#### `mock_http_request(http_request)`
 
 Mock implementation for testing that prints request details.
 
 **Parameters:**
 - `http_request` (HTTPRequestMetadata): Request metadata
 
+**Example:**
+```python
+from http_clientlib.http import mock_http_request
+
+# Use for debugging
+config = Configuration(http_request_function=mock_http_request)
+```
 **Example:**
 ```python
 from http_clientlib.http import mock_http_call
@@ -463,21 +476,19 @@ response = create_user_http(user=new_user)
 
 # Or using dict directly
 response = create_user_http(user={"name": "Bob", "email": "bob@example.com"})
-```
-
 ### Complete Client Service Example
 
 ```python
 from http_clientlib import set_default_configuration, wrap_backend_call
-from http_clientlib.configuration import Configuration
-from http_clientlib.http import perform_http_call
+from http_clientlib.http import make_http_request
 from my_backend.api import login, get_user, create_user, UserCreate
 
 class APIClient:
     def __init__(self, base_url: str):
-        config = Configuration(
+        set_default_configuration(
             base_url=base_url,
-            http_call_func=perform_http_call
+            http_request_function=make_http_request
+        )all
         )
         set_default_configuration(config)
         
@@ -524,11 +535,16 @@ if client.authenticate("admin", "secret"):
 **1. "No configuration provided" Error**
 
 ```python
+from http_clientlib.http import make_http_request
+
 # Problem: Calling wrap_backend_call without setting configuration
 wrapped = wrap_backend_call(my_func)  # Error!
 
 # Solution: Set default configuration first
-set_default_configuration(Configuration(base_url="http://localhost:8000"))
+set_default_configuration(
+    base_url="http://localhost:8000",
+    http_request_function=make_http_request
+)
 wrapped = wrap_backend_call(my_func)  
 ```
 

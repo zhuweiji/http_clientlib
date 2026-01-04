@@ -25,4 +25,4 @@ def make_http_request(http_request: HTTPRequestMetadata) -> HTTPResponse:
         params=http_request.query_values,
         json=http_request.body,
     )
-    return response
+    return response  # type: ignore[return-value]

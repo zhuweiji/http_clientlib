@@ -21,27 +21,6 @@ def set_default_configuration(
     )
 
 
-def http_client_decorator(
-    configuration: Configuration | None = None,
-) -> Callable[[Callable[P, Any]], Callable[P, Any]]:
-    """
-    Create a decorator that wraps FastAPI endpoint functions.
-
-    If no configuration is provided, uses the globally set default configuration.
-    """
-    config = configuration if configuration is not None else _default_configuration
-    if config is None:
-        raise RuntimeError(
-            "No configuration provided and no default configuration set. "
-            "Call set_default_configuration() first or pass a Configuration to http_client_decorator()."
-        )
-
-    def decorator(func: Callable[P, Any]) -> Callable[P, Any]:
-        return wrap_backend_call(func, config)
-
-    return decorator
-
-
 def wrap_backend_call(
     func: Callable[P, Any], configuration: Configuration | None = None
 ) -> Callable[P, HTTPResponse]:

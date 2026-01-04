@@ -21,7 +21,6 @@ from examples.user_service.server import (
     update_user,
 )
 from http_clientlib.api import set_default_configuration, wrap_backend_call
-from http_clientlib.configuration import Configuration
 from http_clientlib.http import make_http_request
 from http_clientlib.types import HTTPResponse
 
@@ -36,10 +35,9 @@ class UserServiceClient:
 
     def __init__(self, base_url: str = "http://localhost:8081"):
         """Initialize the client with a base URL."""
-        config = Configuration(
+        set_default_configuration(
             base_url=base_url, http_request_function=make_http_request
         )
-        set_default_configuration(config)
 
         # Wrap backend endpoints with HTTP call behavior
         self.login_http = wrap_backend_call(login)
