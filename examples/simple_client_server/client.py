@@ -21,7 +21,7 @@ print(response)
 
 # Example usage: GET request with path and query parameters
 get_item_http = wrap_backend_call(get_item)
-response = get_item_http(item_id=42, query="test")
+response = get_item_http(item_id=42, page=5)
 print(response)
 
 # Example usage: POST request with request body

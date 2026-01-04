@@ -116,19 +116,6 @@ pip install -e .
 
 ## Configuration
 
-### Basic Configuration
-
-The `Configuration` class controls how HTTP calls are made:
-
-```python
-from http_clientlib.configuration import Configuration
-from http_clientlib.http import make_http_request
-
-config = Configuration(
-    base_url="http://localhost:8000",  # Your backend URL
-    http_request_function=make_http_request   # Function to execute HTTP requests
-)
-```
 
 ### Global vs Local Configuration
 
@@ -140,20 +127,16 @@ from http_clientlib.http import make_http_request
 
 # Set once for all wrapped functions
 set_default_configuration(
-    base_url="http://localhost:8000",
+    base_url="http://api.example.com",
     http_request_function=make_http_request
 )
+```
 
 #### Local Configuration
 
 ```python
 from http_clientlib.configuration import Configuration
 from http_clientlib.http import make_http_request
-
-config = Configuration(
-    base_url="http://localhost:8000",
-    http_request_function=make_http_request
-)
 
 ### Custom HTTP Implementation
 
@@ -186,23 +169,15 @@ def custom_http_call(request: HTTPRequestMetadata):
                 continue
             raise
 
-# Use custom implementation
-config = Configuration(
+
+# Use custom configuration
+custom_config = Configuration(
     base_url="http://api.example.com",
     http_request_function=custom_http_call
 )
-set_default_configuration(
-    base_url=config.base_url,
-    http_request_function=config.http_request_function
-)
-```             continue
-            raise
 
-# Use custom implementation
-config = Configuration(
-    base_url="http://api.example.com",
-    http_call_func=custom_http_call
-)
+from myserver import get_items
+get_items_http = wrap_backend_call(get_items, configuration=custom_config)
 ```
 
 ## API Reference
@@ -253,7 +228,7 @@ get_user_http = wrap_backend_call(get_user)
 ```
 
 
-
+---
 
 ### Types
 
@@ -304,6 +279,8 @@ A library-agnostic protocol for HTTP responses. Compatible with both `requests.R
 - `content`: Get raw bytes
 - `raise_for_status()`: Raise exception for error status codes
 
+---
+
 #### `Configuration`
 
 Holds configuration for HTTP client behavior.
@@ -321,11 +298,8 @@ config = Configuration(
     http_request_function=make_http_request
 )
 ```
-**Attributes:**
-- `base_url` (str): Base URL for API calls (default: "http://localhost:8000")
-- `http_call_func` (Callable): Function to execute HTTP requests
 
-**Example:**
+
 ### HTTP Functions
 
 #### `make_http_request(http_request)`
@@ -361,13 +335,7 @@ from http_clientlib.http import mock_http_request
 # Use for debugging
 config = Configuration(http_request_function=mock_http_request)
 ```
-**Example:**
-```python
-from http_clientlib.http import mock_http_call
-
-# Use for debugging
-config = Configuration(http_call_func=mock_http_call)
-```
+---
 
 ### Parser Functions
 
@@ -476,6 +444,8 @@ response = create_user_http(user=new_user)
 
 # Or using dict directly
 response = create_user_http(user={"name": "Bob", "email": "bob@example.com"})
+```
+
 ### Complete Client Service Example
 
 ```python
@@ -488,9 +458,7 @@ class APIClient:
         set_default_configuration(
             base_url=base_url,
             http_request_function=make_http_request
-        )all
         )
-        set_default_configuration(config)
         
         # Wrap all endpoints
         self.login_http = wrap_backend_call(login)

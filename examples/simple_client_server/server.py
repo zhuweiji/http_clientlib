@@ -22,7 +22,7 @@ def greeting_message() -> Annotated[dict, "GET /"]:
 
 
 @app.get("/items/{item_id}")
-def get_item(item_id: int, query: str = "") -> Annotated[dict, "GET /items/{item_id}"]:
+def get_item(item_id: int, page: int = 0) -> Annotated[dict, "GET /items/{item_id}"]:
     """A GET endpoint with both path and query parameters."""
     return {"item_id": item_id}
 
