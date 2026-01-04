@@ -1,18 +1,16 @@
 """
 A mature user management service client.
 
-Demonstrates:
+Demonstrates usage of fastclient to build a client library for a backend API that includes:
 - Authentication and token management
-- Building a client-side service wrapper around backend endpoints
 - Error handling
 - Pagination
-- Type-safe API calls using fastclient
+- Type-safe HTTP calls using fastclient
 """
 
+import httpx
+
 from examples.user_service.server import (
-    AuthToken,
-    PaginatedResponse,
-    User,
     UserCreate,
     UserUpdate,
     create_user,
@@ -22,9 +20,10 @@ from examples.user_service.server import (
     login,
     update_user,
 )
-from fastclient.api import set_default_configuration, wrap_backend_call
-from fastclient.configuration import Configuration
-from fastclient.http import perform_http_call
+from http_clientlib.api import set_default_configuration, wrap_backend_call
+from http_clientlib.configuration import Configuration
+from http_clientlib.http import make_http_request
+from http_clientlib.types import HTTPResponse
 
 
 class UserServiceClient:
@@ -37,18 +36,32 @@ class UserServiceClient:
 
     def __init__(self, base_url: str = "http://localhost:8081"):
         """Initialize the client with a base URL."""
-        config = Configuration(base_url=base_url, http_call_func=perform_http_call)
+        config = Configuration(
+            base_url=base_url, http_request_function=make_http_request
+        )
         set_default_configuration(config)
 
         # Wrap backend endpoints with HTTP call behavior
-        self._login = wrap_backend_call(login)
-        self._list_users = wrap_backend_call(list_users)
-        self._get_user = wrap_backend_call(get_user)
-        self._create_user = wrap_backend_call(create_user)
-        self._update_user = wrap_backend_call(update_user)
-        self._delete_user = wrap_backend_call(delete_user)
+        self.login_http = wrap_backend_call(login)
+        self.list_users_http = wrap_backend_call(list_users)
+        self.get_user_http = wrap_backend_call(get_user)
+        self.create_user_http = wrap_backend_call(create_user)
+        self.update_user_http = wrap_backend_call(update_user)
+        self.delete_user_http = wrap_backend_call(delete_user)
 
         self.token: str | None = None
+
+    def handle_response(self, response: HTTPResponse):
+        """Handle HTTP response, raising exceptions for error status codes."""
+        try:
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            print(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
+            raise
+        except httpx.RequestError as e:
+            print(f"Request error occurred: {e}")
+            raise
 
     def authenticate(self, username: str, password: str) -> bool:
         """
@@ -57,15 +70,19 @@ class UserServiceClient:
         Returns True if authentication was successful, False otherwise.
         """
         try:
-            response: AuthToken = self._login(username=username, password=password)
-            self.token = response.access_token
-            print(f"✓ Authenticated successfully. Token: {self.token[:20]}...")
+            response = self.login_http(username=username, password=password)
+            result = self.handle_response(response)
+            if "access_token" not in result:
+                raise ValueError("Authentication response missing access_token")
+            self.token = result["access_token"]
+            print(f"Authenticated successfully. Token: {self.token}")
             return True
+
         except Exception as e:
-            print(f"✗ Authentication failed: {e}")
+            print(f"Authentication failed: {e}")
             return False
 
-    def get_users(self, skip: int = 0, limit: int = 10) -> PaginatedResponse | None:
+    def get_users(self, skip: int = 0, limit: int = 10):
         """
         Fetch a paginated list of users.
 
@@ -77,16 +94,18 @@ class UserServiceClient:
             PaginatedResponse with users and pagination info, or None if failed.
         """
         try:
-            response: PaginatedResponse = self._list_users(
-                skip=skip, limit=limit, token=self.token
-            )
-            print(f"✓ Fetched {len(response.items)} users (total: {response.total})")
-            return response
+            response = self.list_users_http(skip=skip, limit=limit, token=self.token)
+            result = self.handle_response(response)
+            if "items" not in result or "total" not in result:
+                raise ValueError("List users response missing required fields")
+            print(f"Fetched {len(result['items'])} users (total: {result['total']})")
+            return result
+
         except Exception as e:
-            print(f"✗ Failed to fetch users: {e}")
+            print(f"Failed to fetch users: {e}")
             return None
 
-    def get_user_by_id(self, user_id: int) -> User | None:
+    def get_user_by_id(self, user_id: int):
         """
         Fetch a specific user by ID.
 
@@ -97,14 +116,16 @@ class UserServiceClient:
             User object, or None if not found or request failed.
         """
         try:
-            response: User = self._get_user(user_id=user_id, token=self.token)
-            print(f"✓ Fetched user: {response.name} ({response.email})")
-            return response
+            response = self.get_user_http(user_id=user_id, token=self.token)
+            result = self.handle_response(response)
+            print(f"✓ Fetched user: {result['name']} ({result['email']})")
+            return result
+
         except Exception as e:
             print(f"✗ Failed to fetch user {user_id}: {e}")
             return None
 
-    def create_new_user(self, name: str, email: str) -> User | None:
+    def create_new_user(self, name: str, email: str):
         """
         Create a new user.
 
@@ -117,14 +138,20 @@ class UserServiceClient:
         """
         try:
             user_data = UserCreate(name=name, email=email)
-            response: User = self._create_user(user=user_data, token=self.token)
-            print(f"✓ Created user: {response.name} (ID: {response.id})")
-            return response
+            response = self.create_user_http(user=user_data, token=self.token)
+            result = self.handle_response(response)
+            if "id" not in result:
+                raise ValueError("Create user response missing user ID")
+            if "name" not in result:
+                raise ValueError("Create user response missing user name")
+
+            print(f"Created user: {result['name']} (ID: {result['id']})")
+            return result
         except Exception as e:
-            print(f"✗ Failed to create user: {e}")
+            print(f"Failed to create user: {e}")
             return None
 
-    def update_user_info(self, user_id: int, **kwargs) -> User | None:
+    def update_user_info(self, user_id: int, **kwargs):
         """
         Update a user's information.
 
@@ -137,11 +164,12 @@ class UserServiceClient:
         """
         try:
             user_update = UserUpdate(**kwargs)
-            response: User = self._update_user(
+            response = self.update_user_http(
                 user_id=user_id, user_update=user_update, token=self.token
             )
+            result = self.handle_response(response)
             print(f"✓ Updated user {user_id}")
-            return response
+            return result
         except Exception as e:
             print(f"✗ Failed to update user {user_id}: {e}")
             return None
@@ -157,11 +185,13 @@ class UserServiceClient:
             True if deletion was successful, False otherwise.
         """
         try:
-            self._delete_user(user_id=user_id, token=self.token)
-            print(f"✓ Deleted user {user_id}")
+            response = self.delete_user_http(user_id=user_id, token=self.token)
+            result = self.handle_response(response)
+            print(result)
+            print(f"Deleted user {user_id}")
             return True
         except Exception as e:
-            print(f"✗ Failed to delete user {user_id}: {e}")
+            print(f"Failed to delete user {user_id}: {e}")
             return False
 
 
@@ -188,21 +218,22 @@ if __name__ == "__main__":
     # 3. List users with pagination
     print("\n[3] Listing all users (first page, limit 2)...")
     users_page = client.get_users(skip=0, limit=2)
+
     if users_page:
-        for user in users_page.items:
-            print(f"  - {user.name} ({user.email}) - Active: {user.is_active}")
+        for user in users_page["items"]:
+            print(f"  - {user['name']} ({user['email']}) - Active: {user['is_active']}")
 
     # 4. Get a specific user
     print("\n[4] Getting specific user (ID: 1)...")
     user = client.get_user_by_id(1)
     if user:
-        print(f"  Details: {user.name} - {user.email}")
+        print(f"  Details: {user['name']} - {user['email']}")
 
     # 5. Update a user
     print("\n[5] Updating user (ID: 2)...")
     updated = client.update_user_info(2, name="Robert Smith", is_active=True)
     if updated:
-        print(f"  Updated to: {updated.name}")
+        print(f"  Updated to: {updated['name']} - Active: {updated['is_active']}")
 
     # 6. Delete a user
     print("\n[6] Deleting user (ID: 3)...")
@@ -212,9 +243,9 @@ if __name__ == "__main__":
     print("\n[7] Listing users again (after deletion)...")
     users_page = client.get_users(skip=0, limit=10)
     if users_page:
-        print(f"  Total users: {users_page.total}")
-        for user in users_page.items:
-            print(f"  - {user.name} ({user.email})")
+        print(f"  Total users: {users_page['total']}")
+        for user in users_page["items"]:
+            print(f"  - {user['name']} ({user['email']})")
 
     print("\n" + "=" * 60)
     print("Demonstration complete!")

@@ -1,30 +1,29 @@
 from functools import wraps
-from typing import Callable, TypeVar
+from typing import Any, Callable, ParamSpec
 
-from fastclient.configuration import Configuration
-from fastclient.helpers import (
-    extract_param_types,
-    extract_path_params,
-    extract_route_info,
-    parse_route_info,
-    serialize_body,
-)
-from fastclient.types import HTTPRequestMetadata
+from http_clientlib import parsers as parser
+from http_clientlib.configuration import Configuration
+from http_clientlib.types import HTTPRequestMetadata, HTTPResponse
 
-F = TypeVar("F", bound=Callable)
+P = ParamSpec("P")
 
 # Global default configuration
 _default_configuration: Configuration | None = None
 
 
-def set_default_configuration(configuration: Configuration) -> None:
+def set_default_configuration(
+    base_url: str,
+    http_request_function: Callable[[HTTPRequestMetadata], HTTPResponse],
+) -> None:
     global _default_configuration
-    _default_configuration = configuration
+    _default_configuration = Configuration(
+        base_url=base_url, http_request_function=http_request_function
+    )
 
 
 def http_client_decorator(
     configuration: Configuration | None = None,
-) -> Callable[[F], F]:
+) -> Callable[[Callable[P, Any]], Callable[P, Any]]:
     """
     Create a decorator that wraps FastAPI endpoint functions.
 
@@ -37,13 +36,15 @@ def http_client_decorator(
             "Call set_default_configuration() first or pass a Configuration to http_client_decorator()."
         )
 
-    def decorator(func: F) -> F:
+    def decorator(func: Callable[P, Any]) -> Callable[P, Any]:
         return wrap_backend_call(func, config)
 
     return decorator
 
 
-def wrap_backend_call(func: F, configuration: Configuration | None = None) -> F:
+def wrap_backend_call(
+    func: Callable[P, Any], configuration: Configuration | None = None
+) -> Callable[P, HTTPResponse]:
     """
     Wrap a FastAPI endpoint function to simulate an HTTP call.
 
@@ -63,9 +64,9 @@ def wrap_backend_call(func: F, configuration: Configuration | None = None) -> F:
             "Call set_default_configuration() first or pass a Configuration to wrap_endpoint()."
         )
 
-    route_info = extract_route_info(func)
-    path_params = extract_path_params(route_info)
-    query_params, body_params = extract_param_types(func, path_params)
+    route_info = parser.extract_route_info(func)
+    path_params = parser.extract_path_params(route_info)
+    query_params, body_params = parser.extract_param_types(func, path_params)
 
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -75,10 +76,10 @@ def wrap_backend_call(func: F, configuration: Configuration | None = None) -> F:
         body_values = {k: v for k, v in kwargs.items() if k in body_params}
 
         # Serialize body if present
-        serialized_body = serialize_body(body_values, body_params)
+        serialized_body = parser.serialize_body(body_values, body_params)
 
         # Parse route info into method and path
-        method, path = parse_route_info(route_info)
+        method, path = parser.parse_route_info(route_info)
 
         # Create HTTP request object
         http_request = HTTPRequestMetadata(
@@ -90,9 +91,6 @@ def wrap_backend_call(func: F, configuration: Configuration | None = None) -> F:
             body=serialized_body,
         )
 
-        # Call the HTTP mock function
-        config.http_call_func(http_request)
+        return config.http_request_function(http_request)
 
-        return func(*args, **kwargs)
-
-    return wrapper  # type: ignore[return-value]
+    return wrapper

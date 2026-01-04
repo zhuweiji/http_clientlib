@@ -1,11 +1,11 @@
 import httpx
 
-from fastclient.types import HTTPRequestMetadata
+from http_clientlib.types import HTTPRequestMetadata, HTTPResponse
 
 base_url = "http://localhost:8000"
 
 
-def mock_http_call(http_request: HTTPRequestMetadata):
+def mock_http_request(http_request: HTTPRequestMetadata) -> None:
     # Log HTTP request metadata
     print(f"HTTP Request: {http_request.method} {http_request.path}")
     if http_request.path_values:
@@ -16,7 +16,7 @@ def mock_http_call(http_request: HTTPRequestMetadata):
         print(f"  Body: {http_request.body}")
 
 
-def perform_http_call(http_request: HTTPRequestMetadata):
+def make_http_request(http_request: HTTPRequestMetadata) -> HTTPResponse:
     """Perform an actual HTTP call based on the GeneratableHTTPRequest data."""
 
     response = httpx.request(

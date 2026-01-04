@@ -6,12 +6,11 @@ from examples.simple_client_server.server import (
     greeting_message,
     post_endpoint,
 )
-from fastclient.api import set_default_configuration, wrap_backend_call
-from fastclient.configuration import Configuration
-from fastclient.http import perform_http_call
+from http_clientlib import set_default_configuration, wrap_backend_call
+from http_clientlib.http import make_http_request
 
 set_default_configuration(
-    Configuration(base_url="http://localhost:8080", http_call_func=perform_http_call)
+    base_url="http://localhost:8080", http_request_function=make_http_request
 )
 
 
@@ -31,4 +30,4 @@ response = create_item_http(data=ItemData(id=1, name="A Box"))
 
 # Example usage: POST request using a dictionary for the request body directly
 # response = create_item_http(data={"id": 1, "name": "Sample Item"})
-# print(response)
+print(response)
