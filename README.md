@@ -18,7 +18,8 @@ But, with this package, your client side code can now have descriptive type info
 
 **How it works:**
 
-- Import server functions decorated with FastAPI/Flask on the client side
+- Define server endpoints with FastAPI/Flask decorators and **Annotated return types** that specify the HTTP method and path (e.g., `Annotated[dict, "GET /items/{item_id}"]`)
+- Import these server functions on the client side
 - Wrap them with `wrap_backend_call()`
 - Call them as regular functions; the library translates calls into HTTP requests
 - Handle the HTTP responses as per usual
